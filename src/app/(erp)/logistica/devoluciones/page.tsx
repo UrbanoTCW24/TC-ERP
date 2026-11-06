@@ -29,12 +29,17 @@ type Devolucion = {
   fecha: string;
   estatus: 'Pendiente' | 'Procesado' | 'Rechazado';
   tecnico?: string;
+  /** id de fila en series o receptions según el flujo */
+  dbId?: string;
+  /** Categoría backoffice / logística para filtrar pestañas */
+  category: string;
+  os?: string;
 };
 
 const mockDevoluciones: Devolucion[] = [
-  { id: 'DEV-9901', sn: 'SN-HUA-1122', cliente: 'Tienda Zona 10', motivo: 'Garantía - No enciende', fecha: '28/04/2026', estatus: 'Pendiente' },
-  { id: 'DEV-9902', sn: 'SN-NOK-3344', cliente: 'CAC Quetzaltenango', motivo: 'Cambio de Tecnología', fecha: '28/04/2026', estatus: 'Procesado', tecnico: 'Herbert P.' },
-  { id: 'DEV-9905', sn: 'SN-ZTE-5566', cliente: 'Individual - 01', motivo: 'Error de Despacho', fecha: '27/04/2026', estatus: 'Pendiente' },
+  { id: 'DEV-9901', sn: 'SN-HUA-1122', cliente: 'Tienda Zona 10', motivo: 'Garantía - No enciende', fecha: '28/04/2026', estatus: 'Pendiente', category: 'BODEGA DEVOLUCIÓN' },
+  { id: 'DEV-9902', sn: 'SN-NOK-3344', cliente: 'CAC Quetzaltenango', motivo: 'Cambio de Tecnología', fecha: '28/04/2026', estatus: 'Procesado', tecnico: 'Herbert P.', category: 'BODEGA DEVOLUCIÓN' },
+  { id: 'DEV-9905', sn: 'SN-ZTE-5566', cliente: 'Individual - 01', motivo: 'Error de Despacho', fecha: '27/04/2026', estatus: 'Pendiente', category: 'BODEGA DEVOLUCIÓN' },
 ];
 
 const RETURN_REASONS = [
@@ -73,13 +78,13 @@ export default function DevolucionesPage() {
       // 1. Obtenemos series marcadas como 'returned' (individuales)
       const seriesData = await getReturns();
       
-      const adaptedSeries = seriesData.map((r: any) => ({
+      const adaptedSeries: Devolucion[] = seriesData.map((r: any) => ({
         id: `DEV-${r.id.slice(0, 5).toUpperCase()}`,
         sn: r.serial_number,
         cliente: r.receptions?.guide_number || 'S/D',
         motivo: r.notes?.split('Motivo: ')[1]?.split('\n')[0] || 'Garantía',
         fecha: new Date(r.updated_at).toLocaleDateString(),
-        estatus: r.current_status === 'DESPACHADO' ? 'Procesado' : 'Pendiente',
+        estatus: (r.current_status === 'DESPACHADO' ? 'Procesado' : 'Pendiente') as Devolucion['estatus'],
         dbId: r.id,
         category: (r.notes?.includes('Cat: ') ? r.notes.split('Cat: ')[1].split('\n')[0] : 'BODEGA DEVOLUCIÓN'),
         os: r.service_orders?.os_label || '---'
@@ -146,7 +151,7 @@ export default function DevolucionesPage() {
                 cliente: rawCarrier,
                 motivo: rawMotivo !== 'N/A' ? rawMotivo : `Clasificado en Backoffice: ${rawCat || 'Devolución'}`,
                 fecha: new Date(r.created_at).toLocaleDateString(),
-                estatus: r.status === 'DESPACHADO' ? 'Procesado' : 'Pendiente',
+                estatus: (r.status === 'DESPACHADO' ? 'Procesado' : 'Pendiente') as Devolucion['estatus'],
                 dbId: r.id,
                 category: finalCat
              });
@@ -155,7 +160,7 @@ export default function DevolucionesPage() {
         });
 
       // Unificamos ambos flujos
-      const allData = [...adaptedSeries, ...adaptedReceptions];
+      const allData: Devolucion[] = [...adaptedSeries, ...adaptedReceptions];
 
       // Filtramos por la pestaña activa
       const filtered = allData.filter((d: any) => d.category === activeCategory);
@@ -320,9 +325,12 @@ export default function DevolucionesPage() {
       }
 
       // 2. Eliminar la sub-recepción (si existe como id)
-      const { data: checkRec } = await supabase.from('receptions').select('id').eq('id', (selectedDev as any).dbId).maybeSingle();
-      if (checkRec) {
-        await supabase.from('receptions').delete().eq('id', (selectedDev as any).dbId);
+      const dbId = (targetDev as Devolucion).dbId;
+      if (dbId) {
+        const { data: checkRec } = await supabase.from('receptions').select('id').eq('id', dbId).maybeSingle();
+        if (checkRec) {
+          await supabase.from('receptions').delete().eq('id', dbId);
+        }
       }
 
       // 3. Actualizar la recepción maestra
@@ -575,7 +583,7 @@ export default function DevolucionesPage() {
                   <Button 
                     variant="outline" 
                     className="w-full text-rose-500 border-rose-200 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                    onClick={handleUndoDevolution}
+                    onClick={() => void handleUndoDevolution()}
                     disabled={loading}
                     leftIcon={<RotateCcw className="w-4 h-4" />}
                   >

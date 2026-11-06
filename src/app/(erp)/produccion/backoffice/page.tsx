@@ -638,7 +638,11 @@ export default function BackofficePage() {
     setLoading(true);
     try {
       const supabase = getSupabaseBrowserClient();
-      
+      if (!supabase) {
+        alert("Supabase no está configurado.");
+        return;
+      }
+
       const { error: err } = await supabase
         .from('series')
         .delete()

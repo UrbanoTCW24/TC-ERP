@@ -99,7 +99,11 @@ export function BiometricKiosk() {
 
     try {
       const supabase = getSupabaseBrowserClient();
-      
+      if (!supabase) {
+        showError('Supabase no está configurado.');
+        return;
+      }
+
       if (employee.tipo_contrato === 'Temporada') {
         const today = new Date();
         const start = new Date(employee.inicio_temporada);
@@ -290,6 +294,9 @@ export function BiometricKiosk() {
       setMatchStatus('verifying');
       
       const supabase = getSupabaseBrowserClient();
+      if (!supabase) {
+        throw new Error('Supabase no está configurado.');
+      }
       await supabase.from('time_logs').insert({
         employee_id: punchData.employee.id,
         evento_detectado: punchData.eventToLog,
